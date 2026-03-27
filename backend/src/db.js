@@ -50,10 +50,16 @@ CREATE TABLE IF NOT EXISTS settings (
   sleep_start TEXT NOT NULL DEFAULT '23:00',
   sleep_end TEXT NOT NULL DEFAULT '07:00',
   timezone TEXT NOT NULL DEFAULT 'Asia/Seoul',
-  password_hash TEXT
+  password_hash TEXT,
+  theme TEXT NOT NULL DEFAULT 'system'
 );
 `);
 
 db.prepare(`INSERT OR IGNORE INTO settings (id) VALUES ('default')`).run();
+
+// Migrate: add theme column if not exists
+try {
+  db.exec(`ALTER TABLE settings ADD COLUMN theme TEXT DEFAULT 'system'`);
+} catch (_) { /* column already exists */ }
 
 module.exports = db;
