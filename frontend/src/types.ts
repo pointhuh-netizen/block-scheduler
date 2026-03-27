@@ -41,4 +41,5 @@ export interface Settings {
   sleep_start: string;
   sleep_end: string;
   timezone: string;
+  theme?: 'light' | 'dark' | 'system';
 }

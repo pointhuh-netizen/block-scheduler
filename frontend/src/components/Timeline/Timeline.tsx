@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import type { Task, CalendarEvent, TimeLog, Category, Settings } from '../../types';
 import { timelogs as timelogsApi, events as eventsApi } from '../../api';
+import { useTheme } from '../../theme';
 
 interface Props {
   tasks: Task[];
@@ -120,6 +121,8 @@ function computeGhostBlocks(
 }
 
 export default function Timeline({ tasks, events, timelogs, categories, settings, onTimeLogStop, onRefresh }: Props) {
+  const theme = useTheme();
+  const t = theme;
   const containerRef = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<{ y: number; clickTime: Date; type: 'add' | 'timelog' | 'event'; item?: TimeLog | CalendarEvent } | null>(null);
   const [addForm, setAddForm] = useState<{ mode: 'timelog' | 'event'; title: string; endTime: string } | null>(null);
@@ -172,8 +175,8 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const y = d * 24 * 60 * PX_PER_MIN;
     const isToday = day.toDateString() === new Date().toDateString();
     dayLines.push(
-      <div key={`day-${d}`} style={{ position: 'absolute', left: 0, right: 0, top: y, height: 1, background: isToday ? '#6366f1' : '#2d3748', zIndex: 1 }}>
-        <span style={{ position: 'absolute', left: 48, top: -10, fontSize: 11, color: isToday ? '#6366f1' : '#4a5568', fontWeight: isToday ? 700 : 400, whiteSpace: 'nowrap' }}>
+      <div key={`day-${d}`} style={{ position: 'absolute', left: 0, right: 0, top: y, height: 1, background: isToday ? t.accent : t.border, zIndex: 1 }}>
+        <span style={{ position: 'absolute', left: 48, top: -10, fontSize: 11, color: isToday ? t.accent : t.textMuted, fontWeight: isToday ? 700 : 400, whiteSpace: 'nowrap' }}>
           {day.getMonth() + 1}/{day.getDate()}({['일','월','화','수','목','금','토'][day.getDay()]}){isToday ? ' 오늘' : ''}
         </span>
       </div>
@@ -181,8 +184,8 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     for (let h = 1; h < 24; h++) {
       const hy = y + h * 60 * PX_PER_MIN;
       hourMarks.push(
-        <div key={`h-${d}-${h}`} style={{ position: 'absolute', left: 0, right: 0, top: hy, height: 1, background: '#1e2a3a', zIndex: 0 }}>
-          <span style={{ position: 'absolute', left: 2, top: -8, fontSize: 10, color: '#4a5568', width: 36, textAlign: 'right' }}>{String(h).padStart(2,'0')}:00</span>
+        <div key={`h-${d}-${h}`} style={{ position: 'absolute', left: 0, right: 0, top: hy, height: 1, background: t.mode === 'dark' ? '#1e2a3a' : '#EBEBE3', zIndex: 0 }}>
+          <span style={{ position: 'absolute', left: 2, top: -8, fontSize: 10, color: t.textMuted, width: 36, textAlign: 'right' }}>{String(h).padStart(2,'0')}:00</span>
         </div>
       );
     }
@@ -193,7 +196,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const ey = yPos(p.end, base);
     if (ey < 0 || sy > totalHeight) return null;
     return (
-      <div key={`sleep-${i}`} style={{ position: 'absolute', left: 44, right: 0, top: sy, height: ey - sy, background: 'rgba(15,20,40,0.6)', zIndex: 2, pointerEvents: 'none', borderTop: '1px dashed #374151', borderBottom: '1px dashed #374151' }} />
+      <div key={`sleep-${i}`} style={{ position: 'absolute', left: 44, right: 0, top: sy, height: ey - sy, background: t.sleepBg, zIndex: 2, pointerEvents: 'none', borderTop: `1px dashed ${t.border}`, borderBottom: `1px dashed ${t.border}` }} />
     );
   });
 
@@ -206,11 +209,11 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     return (
       <div key={tl.id} data-block="1" onClick={() => setPopup({ y: sy, clickTime: new Date(tl.start_time), type: 'timelog', item: tl })}
         style={{ position: 'absolute', left: 44, right: 8, top: sy, height: h, background: color + '33', border: `2px solid ${color}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer', zIndex: 5, overflow: 'hidden', boxSizing: 'border-box' }}>
-        <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {active && <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#ef4444', marginRight: 4, verticalAlign: 'middle' }} />}
+        <div style={{ fontSize: 12, color: t.textPrimary, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {active && <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: t.red, marginRight: 4, verticalAlign: 'middle' }} />}
           {tl.title}
         </div>
-        {h > 24 && <div style={{ fontSize: 10, color: '#94a3b8' }}>{new Date(tl.start_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}{tl.end_time ? ` ~ ${new Date(tl.end_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : ' ~'}</div>}
+        {h > 24 && <div style={{ fontSize: 10, color: t.textSecondary }}>{new Date(tl.start_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}{tl.end_time ? ` ~ ${new Date(tl.end_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : ' ~'}</div>}
       </div>
     );
   });
@@ -223,7 +226,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     return (
       <div key={ev.id} data-block="1" onClick={() => setPopup({ y: sy, clickTime: new Date(ev.start_time), type: 'event', item: ev })}
         style={{ position: 'absolute', left: 44, right: 8, top: sy, height: h, background: color + '22', border: `2px dashed ${color}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer', zIndex: 4, overflow: 'hidden', boxSizing: 'border-box' }}>
-        <div style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 600 }}>📌 {ev.title}</div>
+        <div style={{ fontSize: 12, color: t.textPrimary, fontWeight: 600 }}>📌 {ev.title}</div>
       </div>
     );
   });
@@ -234,18 +237,18 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const deadline = new Date(g.task.deadline!);
     const soon = deadline.getTime() - Date.now() < 24 * 3600000;
     return (
-      <div key={`ghost-${i}`} style={{ position: 'absolute', right: 12, width: 120, top: sy, height: Math.max(h, 16), background: soon ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.1)', border: `1px dashed ${soon ? '#ef4444' : '#6366f1'}`, borderRadius: 4, padding: '1px 4px', zIndex: 3, overflow: 'hidden', boxSizing: 'border-box', pointerEvents: 'none' }}>
-        <div style={{ fontSize: 10, color: soon ? '#ef4444' : '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.task.title}</div>
+      <div key={`ghost-${i}`} style={{ position: 'absolute', right: 12, width: 120, top: sy, height: Math.max(h, 16), background: soon ? `${t.red}20` : t.accentLight, border: `1px dashed ${soon ? t.red : t.accent}`, borderRadius: 4, padding: '1px 4px', zIndex: 3, overflow: 'hidden', boxSizing: 'border-box', pointerEvents: 'none' }}>
+        <div style={{ fontSize: 10, color: soon ? t.red : t.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.task.title}</div>
       </div>
     );
   });
 
-  const deadlineLines = tasks.filter(t => t.deadline && t.status !== 'done').map(t => {
-    const dy = yPos(new Date(t.deadline!), base);
-    const soon = new Date(t.deadline!).getTime() - Date.now() < 24 * 3600000;
+  const deadlineLines = tasks.filter(task => task.deadline && task.status !== 'done').map(task => {
+    const dy = yPos(new Date(task.deadline!), base);
+    const soon = new Date(task.deadline!).getTime() - Date.now() < 24 * 3600000;
     return (
-      <div key={`dl-${t.id}`} style={{ position: 'absolute', left: 44, right: 0, top: dy, height: 0, borderTop: `2px dashed ${soon ? '#ef4444' : '#f59e0b'}`, zIndex: 6, pointerEvents: 'none' }}>
-        <span style={{ position: 'absolute', right: 4, top: -16, fontSize: 10, color: soon ? '#ef4444' : '#f59e0b', whiteSpace: 'nowrap' }}>⚑ {t.title}</span>
+      <div key={`dl-${task.id}`} style={{ position: 'absolute', left: 44, right: 0, top: dy, height: 0, borderTop: `2px dashed ${soon ? t.red : t.amber}`, zIndex: 6, pointerEvents: 'none' }}>
+        <span style={{ position: 'absolute', right: 4, top: -16, fontSize: 10, color: soon ? t.red : t.amber, whiteSpace: 'nowrap' }}>⚑ {task.title}</span>
       </div>
     );
   });
@@ -267,7 +270,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
 
   return (
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
-      <div ref={containerRef} onClick={handleContainerClick} style={{ position: 'relative', height: '100%', overflowY: 'scroll', overflowX: 'hidden', background: '#1a1a2e' }}>
+      <div ref={containerRef} onClick={handleContainerClick} style={{ position: 'relative', height: '100%', overflowY: 'scroll', overflowX: 'hidden', background: t.bg }}>
         <div style={{ position: 'relative', height: totalHeight, minWidth: 300 }}>
           {dayLines}
           {hourMarks}
@@ -277,69 +280,69 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
           {eventBlocks}
           {timelogBlocks}
           {/* Current time line */}
-          <div style={{ position: 'absolute', left: 44, right: 0, top: nowY, height: 2, background: '#ef4444', zIndex: 10, pointerEvents: 'none' }}>
-            <div style={{ position: 'absolute', left: -10, top: -5, width: 12, height: 12, borderRadius: '50%', background: '#ef4444' }} />
+          <div style={{ position: 'absolute', left: 44, right: 0, top: nowY, height: 2, background: t.red, zIndex: 10, pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', left: -10, top: -5, width: 12, height: 12, borderRadius: '50%', background: t.red }} />
           </div>
         </div>
       </div>
 
       {/* Scroll to now button */}
-      <button onClick={scrollToNow} style={{ position: 'absolute', bottom: 16, right: 16, background: '#6366f1', color: 'white', border: 'none', borderRadius: 24, padding: '8px 16px', fontSize: 13, cursor: 'pointer', zIndex: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
+      <button onClick={scrollToNow} style={{ position: 'absolute', bottom: 16, right: 16, background: t.accent, color: 'white', border: 'none', borderRadius: 24, padding: '8px 16px', fontSize: 13, cursor: 'pointer', zIndex: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.3)' }}>
         ⏱ 현재로
       </button>
 
       {/* Popup */}
       {popup && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => { setPopup(null); setAddForm(null); }}>
-          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', background: '#16213e', borderRadius: 12, padding: 20, minWidth: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', background: t.bg2, borderRadius: 12, padding: 20, minWidth: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
             {popup.type === 'add' && !addForm && (
               <>
-                <p style={{ margin: '0 0 12px', color: '#94a3b8', fontSize: 13 }}>
+                <p style={{ margin: '0 0 12px', color: t.textSecondary, fontSize: 13 }}>
                   {popup.clickTime.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <button onClick={() => setAddForm({ mode: 'timelog', title: '', endTime: '' })} style={{ padding: '10px 0', background: '#6366f1', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>⏱ 시간 기록 추가</button>
-                  <button onClick={() => setAddForm({ mode: 'event', title: '', endTime: '' })} style={{ padding: '10px 0', background: '#0f3460', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>📌 일정 추가</button>
-                  <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: '#374151', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
+                  <button onClick={() => setAddForm({ mode: 'timelog', title: '', endTime: '' })} style={{ padding: '10px 0', background: t.accent, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>⏱ 시간 기록 추가</button>
+                  <button onClick={() => setAddForm({ mode: 'event', title: '', endTime: '' })} style={{ padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>📌 일정 추가</button>
+                  <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: 'transparent', color: t.textSecondary, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
                 </div>
               </>
             )}
             {popup.type === 'add' && addForm && (
               <form onSubmit={handleAddSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <h4 style={{ margin: 0, color: '#6366f1' }}>{addForm.mode === 'timelog' ? '⏱ 시간 기록' : '📌 일정'} 추가</h4>
+                <h4 style={{ margin: 0, color: t.accent }}>{addForm.mode === 'timelog' ? '⏱ 시간 기록' : '📌 일정'} 추가</h4>
                 <input value={addForm.title} onChange={e => setAddForm(f => f ? { ...f, title: e.target.value } : null)} placeholder="제목" required
-                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #374151', background: '#0f3460', color: '#e2e8f0', fontSize: 14 }} />
-                <label style={{ fontSize: 12, color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
+                <label style={{ fontSize: 12, color: t.textSecondary, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   종료 시간{addForm.mode === 'event' ? ' (필수)' : ' (선택)'}
                   <input type="datetime-local" value={addForm.endTime} onChange={e => setAddForm(f => f ? { ...f, endTime: e.target.value } : null)} required={addForm.mode === 'event'}
-                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #374151', background: '#0f3460', color: '#e2e8f0', fontSize: 14 }} />
+                    style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="submit" style={{ flex: 1, padding: '10px 0', background: '#6366f1', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>추가</button>
-                  <button type="button" onClick={() => { setPopup(null); setAddForm(null); }} style={{ flex: 1, padding: '10px 0', background: '#374151', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
+                  <button type="submit" style={{ flex: 1, padding: '10px 0', background: t.accent, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>추가</button>
+                  <button type="button" onClick={() => { setPopup(null); setAddForm(null); }} style={{ flex: 1, padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
                 </div>
               </form>
             )}
             {popup.type === 'timelog' && popup.item && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <h4 style={{ margin: 0, color: '#6366f1' }}>⏱ {(popup.item as TimeLog).title}</h4>
-                <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>
+                <h4 style={{ margin: 0, color: t.accent }}>⏱ {(popup.item as TimeLog).title}</h4>
+                <p style={{ margin: 0, fontSize: 13, color: t.textSecondary }}>
                   {new Date((popup.item as TimeLog).start_time).toLocaleString('ko-KR')} ~ {(popup.item as TimeLog).end_time ? new Date((popup.item as TimeLog).end_time!).toLocaleString('ko-KR') : '진행 중'}
                 </p>
                 {!(popup.item as TimeLog).end_time && (
-                  <button onClick={() => { onTimeLogStop((popup.item as TimeLog).id); setPopup(null); }} style={{ padding: '10px 0', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>⏹ 중지</button>
+                  <button onClick={() => { onTimeLogStop((popup.item as TimeLog).id); setPopup(null); }} style={{ padding: '10px 0', background: t.red, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>⏹ 중지</button>
                 )}
-                <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: '#374151', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>닫기</button>
+                <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>닫기</button>
               </div>
             )}
             {popup.type === 'event' && popup.item && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <h4 style={{ margin: 0, color: '#6366f1' }}>📌 {(popup.item as CalendarEvent).title}</h4>
-                <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>
+                <h4 style={{ margin: 0, color: t.accent }}>📌 {(popup.item as CalendarEvent).title}</h4>
+                <p style={{ margin: 0, fontSize: 13, color: t.textSecondary }}>
                   {new Date((popup.item as CalendarEvent).start_time).toLocaleString('ko-KR')} ~ {new Date((popup.item as CalendarEvent).end_time).toLocaleString('ko-KR')}
                 </p>
-                {(popup.item as CalendarEvent).description && <p style={{ margin: 0, fontSize: 13, color: '#e2e8f0' }}>{(popup.item as CalendarEvent).description}</p>}
-                <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: '#374151', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>닫기</button>
+                {(popup.item as CalendarEvent).description && <p style={{ margin: 0, fontSize: 13, color: t.textPrimary }}>{(popup.item as CalendarEvent).description}</p>}
+                <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>닫기</button>
               </div>
             )}
           </div>
