@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "${PORT:-3001}:3001"
+    volumes:
+      - sqlite_data:/app/data
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-changeme}
+      - NODE_ENV=production
+      - TZ=${TZ:-Asia/Seoul}
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+volumes:
+  sqlite_data:
