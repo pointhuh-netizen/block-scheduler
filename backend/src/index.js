@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -16,13 +17,31 @@ if (!fs.existsSync(dataDir)) {
 app.use(cors());
 app.use(express.json());
 
+// Strict rate limiter for auth endpoints (brute-force protection)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '너무 많은 요청입니다. 잠시 후 다시 시도하세요.' },
+});
+
+// General rate limiter for all API routes
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '너무 많은 요청입니다. 잠시 후 다시 시도하세요.' },
+});
+
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/categories', require('./routes/categories'));
-app.use('/api/tasks', require('./routes/tasks'));
-app.use('/api/events', require('./routes/events'));
-app.use('/api/timelogs', require('./routes/timelogs'));
-app.use('/api/settings', require('./routes/settings'));
+app.use('/api/auth', authLimiter, require('./routes/auth'));
+app.use('/api/categories', apiLimiter, require('./routes/categories'));
+app.use('/api/tasks', apiLimiter, require('./routes/tasks'));
+app.use('/api/events', apiLimiter, require('./routes/events'));
+app.use('/api/timelogs', apiLimiter, require('./routes/timelogs'));
+app.use('/api/settings', apiLimiter, require('./routes/settings'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
