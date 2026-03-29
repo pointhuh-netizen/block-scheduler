@@ -169,6 +169,14 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
   const [addForm, setAddForm] = useState<{ mode: 'timelog' | 'event'; title: string; categoryId: string; endTime: string } | null>(null);
   const [editForm, setEditForm] = useState<{ title: string; categoryId: string; startTime: string; endTime: string } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [now, setNow] = useState(new Date());
+  const hasActiveTimelog = timelogs.some(tl => !tl.end_time);
+
+  useEffect(() => {
+    const interval = hasActiveTimelog ? 10000 : 60000;
+    const id = setInterval(() => setNow(new Date()), interval);
+    return () => clearInterval(id);
+  }, [hasActiveTimelog]);
 
   const base = todayMidnight();
   base.setDate(base.getDate() - DAYS_BEFORE);
@@ -276,7 +284,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     }
   };
 
-  const nowY = yPos(new Date(), base);
+  const nowY = yPos(now, base);
 
   const dayLines: React.ReactNode[] = [];
   const hourMarks: React.ReactNode[] = [];
