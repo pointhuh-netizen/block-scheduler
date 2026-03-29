@@ -371,15 +371,31 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     );
   });
 
-  const deadlineLines = tasks.filter(task => task.deadline && task.status !== 'done').map(task => {
-    const dy = yPos(new Date(task.deadline!), base);
-    const soon = new Date(task.deadline!).getTime() - Date.now() < 24 * 3600000;
-    return (
-      <div key={`dl-${task.id}`} style={{ position: 'absolute', left: 44, right: 0, top: dy, height: 0, borderTop: `2px dashed ${soon ? t.red : t.amber}`, zIndex: 6, pointerEvents: 'none' }}>
-        <span style={{ position: 'absolute', right: 4, top: -16, fontSize: 10, color: soon ? t.red : t.amber, whiteSpace: 'nowrap' }}>⚑ {task.title}</span>
-      </div>
-    );
-  });
+  const deadlineLines = (() => {
+    const filtered = tasks.filter(task => task.deadline && task.status !== 'done');
+    // Group tasks by Y position (within 2px tolerance)
+    const groups: Array<{ dy: number; tasks: typeof filtered }> = [];
+    for (const task of filtered) {
+      const dy = yPos(new Date(task.deadline!), base);
+      const existing = groups.find(g => Math.abs(g.dy - dy) <= 2);
+      if (existing) {
+        existing.tasks.push(task);
+      } else {
+        groups.push({ dy, tasks: [task] });
+      }
+    }
+    return groups.map(({ dy, tasks: groupTasks }) => {
+      const soon = groupTasks.some(task => new Date(task.deadline!).getTime() - Date.now() < 24 * 3600000);
+      const soonByTask = new Map(groupTasks.map(task => [task.id, new Date(task.deadline!).getTime() - Date.now() < 24 * 3600000]));
+      return (
+        <div key={`dl-${groupTasks[0].id}`} style={{ position: 'absolute', left: 44, right: 0, top: dy, height: 0, borderTop: `2px dashed ${soon ? t.red : t.amber}`, zIndex: 6, pointerEvents: 'none' }}>
+          {groupTasks.map((task, idx) => (
+            <span key={task.id} style={{ position: 'absolute', right: 4, top: -16 - idx * 12, fontSize: 10, color: soonByTask.get(task.id) ? t.red : t.amber, whiteSpace: 'nowrap' }}>⚑ {task.title}</span>
+          ))}
+        </div>
+      );
+    });
+  })();
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

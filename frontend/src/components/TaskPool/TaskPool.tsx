@@ -54,7 +54,9 @@ export default function TaskPool({ tasks, categories, timelogs, onRefresh }: Pro
   }, []);
 
   const [addForm, setAddForm] = useState({ title: '', description: '', estimated_size: 'medium' as Task['estimated_size'], deadline: '', category_id: '' });
+  const [addDeadlineWithTime, setAddDeadlineWithTime] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '', estimated_size: 'medium' as Task['estimated_size'], deadline: '', category_id: '' });
+  const [editDeadlineWithTime, setEditDeadlineWithTime] = useState(false);
 
   const activeTimelogByTask = useMemo(() => {
     const map = new Map<string, TimeLog>();
@@ -141,22 +143,33 @@ export default function TaskPool({ tasks, categories, timelogs, onRefresh }: Pro
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    await tasksApi.create({ ...addForm, deadline: addForm.deadline || undefined, category_id: addForm.category_id || undefined, description: addForm.description || undefined });
+    const deadline = addForm.deadline
+      ? (addDeadlineWithTime ? addForm.deadline : `${addForm.deadline}T23:59`)
+      : undefined;
+    await tasksApi.create({ ...addForm, deadline, category_id: addForm.category_id || undefined, description: addForm.description || undefined });
     onRefresh();
     setShowAdd(false);
     setAddForm({ title: '', description: '', estimated_size: 'medium', deadline: '', category_id: '' });
+    setAddDeadlineWithTime(false);
   };
 
   const handleEditTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editModal) return;
-    await tasksApi.update(editModal.task.id, { ...editForm, deadline: editForm.deadline || undefined, category_id: editForm.category_id || undefined, description: editForm.description || undefined });
+    const deadline = editForm.deadline
+      ? (editDeadlineWithTime ? editForm.deadline : `${editForm.deadline}T23:59`)
+      : undefined;
+    await tasksApi.update(editModal.task.id, { ...editForm, deadline, category_id: editForm.category_id || undefined, description: editForm.description || undefined });
     onRefresh();
     setEditModal(null);
   };
 
   const openEdit = (task: Task) => {
-    setEditForm({ title: task.title, description: task.description || '', estimated_size: task.estimated_size, deadline: task.deadline ? task.deadline.slice(0,16) : '', category_id: task.category_id || '' });
+    const deadlineSliced = task.deadline ? task.deadline.slice(0, 16) : '';
+    // hasCustomTime is true only if it's a full datetime (16 chars) AND time is not 23:59
+    const hasCustomTime = deadlineSliced.length === 16 && !deadlineSliced.endsWith('T23:59');
+    setEditDeadlineWithTime(hasCustomTime);
+    setEditForm({ title: task.title, description: task.description || '', estimated_size: task.estimated_size, deadline: hasCustomTime ? deadlineSliced : (deadlineSliced ? deadlineSliced.slice(0, 10) : ''), category_id: task.category_id || '' });
     setEditModal({ task });
     setActionModal(null);
   };
@@ -269,7 +282,18 @@ export default function TaskPool({ tasks, categories, timelogs, onRefresh }: Pro
               {Object.entries(SIZE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <label style={{ fontSize: 12, color: t.textSecondary }}>마감일
-              <input type="datetime-local" value={editForm.deadline} onChange={e => setEditForm(f => ({ ...f, deadline: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              <input type={editDeadlineWithTime ? 'datetime-local' : 'date'} value={editForm.deadline} onChange={e => setEditForm(f => ({ ...f, deadline: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontWeight: 'normal', cursor: 'pointer' }}>
+                <input type="checkbox" checked={editDeadlineWithTime} onChange={e => {
+                  const checked = e.target.checked;
+                  setEditDeadlineWithTime(checked);
+                  setEditForm(f => {
+                    const datePart = f.deadline ? f.deadline.slice(0, 10) : '';
+                    return { ...f, deadline: datePart };
+                  });
+                }} />
+                시간도 지정
+              </label>
             </label>
             <select value={editForm.category_id} onChange={e => setEditForm(f => ({ ...f, category_id: e.target.value }))} style={inputStyle}>
               <option value="">카테고리 없음</option>
@@ -295,7 +319,18 @@ export default function TaskPool({ tasks, categories, timelogs, onRefresh }: Pro
               {Object.entries(SIZE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <label style={{ fontSize: 12, color: t.textSecondary }}>마감일
-              <input type="datetime-local" value={addForm.deadline} onChange={e => setAddForm(f => ({ ...f, deadline: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              <input type={addDeadlineWithTime ? 'datetime-local' : 'date'} value={addForm.deadline} onChange={e => setAddForm(f => ({ ...f, deadline: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontWeight: 'normal', cursor: 'pointer' }}>
+                <input type="checkbox" checked={addDeadlineWithTime} onChange={e => {
+                  const checked = e.target.checked;
+                  setAddDeadlineWithTime(checked);
+                  setAddForm(f => {
+                    const datePart = f.deadline ? f.deadline.slice(0, 10) : '';
+                    return { ...f, deadline: datePart };
+                  });
+                }} />
+                시간도 지정
+              </label>
             </label>
             <select value={addForm.category_id} onChange={e => setAddForm(f => ({ ...f, category_id: e.target.value }))} style={inputStyle}>
               <option value="">카테고리 없음</option>
