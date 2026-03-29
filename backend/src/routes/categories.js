@@ -12,7 +12,7 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, color = '#6366f1', icon } = req.body;
+  const { name, color = '#7CB3E0', icon } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
   const id = crypto.randomUUID();
   db.prepare('INSERT INTO categories (id, name, color, icon) VALUES (?, ?, ?, ?)').run(id, name, color, icon || null);

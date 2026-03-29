@@ -8,7 +8,7 @@ import { ThemeContext, resolveTheme, type ThemeMode } from './theme';
 type AuthState = 'loading' | 'need_setup' | 'need_login' | 'authenticated';
 
 type CatForm = { name: string; color: string; icon: string };
-const PRESET_COLORS = ['#7C7FF5', '#F87171', '#34D399', '#FBBF24', '#60A5FA', '#F472B6', '#A78BFA', '#FB923C'];
+const PRESET_COLORS = ['#7CB3E0', '#A78BCA', '#7EC8A0', '#E8A087', '#E8D07A', '#D4A0B9', '#9CC5E0', '#B0A89A'];
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('loading');
@@ -24,7 +24,7 @@ export default function App() {
   const [settingsForm, setSettingsForm] = useState<Settings>({ sleep_start: '23:00', sleep_end: '07:00', timezone: 'Asia/Seoul', theme: 'system' });
 
   // Category management state
-  const [catForm, setCatForm] = useState<CatForm>({ name: '', color: '#7C7FF5', icon: '' });
+  const [catForm, setCatForm] = useState<CatForm>({ name: '', color: '#7CB3E0', icon: '' });
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [showCatAdd, setShowCatAdd] = useState(false);
 
@@ -99,7 +99,7 @@ export default function App() {
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     await categoriesApi.create({ name: catForm.name, color: catForm.color, icon: catForm.icon || undefined });
-    setCatForm({ name: '', color: '#7C7FF5', icon: '' });
+    setCatForm({ name: '', color: '#7CB3E0', icon: '' });
     setShowCatAdd(false);
     loadData();
   };
@@ -245,7 +245,7 @@ export default function App() {
               <div style={{ marginTop: 20, borderTop: `1px solid ${t.border}`, paddingTop: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <h4 style={{ margin: 0, color: t.textPrimary, fontSize: 14 }}>🏷️ 카테고리 관리</h4>
-                  <button onClick={() => { setShowCatAdd(v => !v); setEditingCat(null); setCatForm({ name: '', color: '#7C7FF5', icon: '' }); }}
+                  <button onClick={() => { setShowCatAdd(v => !v); setEditingCat(null); setCatForm({ name: '', color: '#7CB3E0', icon: '' }); }}
                     style={{ background: t.accent, color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
                     {showCatAdd ? '취소' : '＋ 추가'}
                   </button>
