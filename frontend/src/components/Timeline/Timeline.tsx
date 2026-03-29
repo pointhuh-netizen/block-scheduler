@@ -20,6 +20,11 @@ const DAYS_BEFORE = 30;
 const DAYS_AFTER = 30;
 const TOTAL_DAYS = DAYS_BEFORE + DAYS_AFTER;
 
+// Background opacity suffixes for timeline blocks (hex: ~24% dark / ~16% light)
+const TIMELOG_BG_ALPHA = { dark: '3D', light: '28' } as const;
+// Background opacity suffixes for event blocks (hex: ~20% dark / ~13% light)
+const EVENT_BG_ALPHA = { dark: '33', light: '22' } as const;
+
 const SIZE_MINUTES: Record<string, number> = {
   small: 15, medium: 60, large: 120, half_day: 240, full_day: 480
 };
@@ -201,8 +206,8 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
   };
 
   const getCategoryColor = useCallback((id?: string) => {
-    if (!id) return '#6366f1';
-    return categories.find(c => c.id === id)?.color || '#6366f1';
+    if (!id) return '#9CC5E0';
+    return categories.find(c => c.id === id)?.color || '#9CC5E0';
   }, [categories]);
 
   useEffect(() => {
@@ -322,7 +327,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const widthExpr = total > 1 ? `calc(${colWidthExpr} - 2px)` : `calc(100% - ${blockAreaLeft + blockAreaRight}px)`;
     return (
       <div key={tl.id} data-block="1" onClick={() => openEditPopup('timelog', tl, sy)}
-        style={{ position: 'absolute', left: `calc(${leftExpr})`, width: widthExpr, top: sy, height: h, background: color + '33', border: `2px solid ${color}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer', zIndex: 5, overflow: 'hidden', boxSizing: 'border-box' }}>
+        style={{ position: 'absolute', left: `calc(${leftExpr})`, width: widthExpr, top: sy, height: h, background: color + TIMELOG_BG_ALPHA[t.mode], border: 'none', borderLeft: `3px solid ${color}`, borderRadius: '0 6px 6px 0', padding: '2px 6px', cursor: 'pointer', zIndex: 5, overflow: 'hidden', boxSizing: 'border-box' }}>
         <div style={{ fontSize: 12, color: t.textPrimary, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {active && <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: t.red, marginRight: 4, verticalAlign: 'middle' }} />}
           {tl.title}
@@ -339,7 +344,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const color = getCategoryColor(ev.category_id);
     return (
       <div key={ev.id} data-block="1" onClick={() => openEditPopup('event', ev, sy)}
-        style={{ position: 'absolute', left: 44, right: 8, top: sy, height: h, background: color + '22', border: `2px dashed ${color}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer', zIndex: 4, overflow: 'hidden', boxSizing: 'border-box' }}>
+        style={{ position: 'absolute', left: 44, right: 8, top: sy, height: h, background: color + EVENT_BG_ALPHA[t.mode], border: 'none', borderLeft: `3px solid ${color}`, borderRadius: '0 6px 6px 0', padding: '2px 6px', cursor: 'pointer', zIndex: 4, overflow: 'hidden', boxSizing: 'border-box' }}>
         <div style={{ fontSize: 12, color: t.textPrimary, fontWeight: 600 }}>📌 {ev.title}</div>
       </div>
     );
@@ -350,8 +355,9 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const h = (g.end.getTime() - g.start.getTime()) / 60000 * PX_PER_MIN;
     const deadline = new Date(g.task.deadline!);
     const soon = deadline.getTime() - Date.now() < 24 * 3600000;
+    const ghostColor = getCategoryColor(g.task.category_id);
     return (
-      <div key={`ghost-${i}`} style={{ position: 'absolute', right: 12, width: 120, top: sy, height: Math.max(h, 16), background: soon ? `${t.red}20` : t.accentLight, border: `1px dashed ${soon ? t.red : t.accent}`, borderRadius: 4, padding: '1px 4px', zIndex: 3, overflow: 'hidden', boxSizing: 'border-box', pointerEvents: 'none' }}>
+      <div key={`ghost-${i}`} style={{ position: 'absolute', right: 12, width: 120, top: sy, height: Math.max(h, 16), background: soon ? `${t.red}20` : ghostColor + '20', border: `1px dashed ${soon ? t.red : ghostColor}`, borderRadius: 4, padding: '1px 4px', zIndex: 3, overflow: 'hidden', boxSizing: 'border-box', pointerEvents: 'none' }}>
         <div style={{ fontSize: 10, color: soon ? t.red : t.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.task.title}</div>
       </div>
     );
