@@ -120,6 +120,42 @@ function computeGhostBlocks(
   return ghosts;
 }
 
+function computeTimelogColumns(timelogs: TimeLog[]): Map<string, { col: number; total: number }> {
+  const now = Date.now();
+  const intervals = timelogs.map(tl => ({
+    id: tl.id,
+    start: new Date(tl.start_time).getTime(),
+    end: tl.end_time ? new Date(tl.end_time).getTime() : now,
+  })).sort((a, b) => a.start - b.start || a.end - b.end);
+
+  const colAssign = new Map<string, number>();
+  const colEndTimes: number[] = [];
+
+  for (const iv of intervals) {
+    let assigned = -1;
+    for (let c = 0; c < colEndTimes.length; c++) {
+      if (colEndTimes[c] <= iv.start) {
+        assigned = c;
+        colEndTimes[c] = iv.end;
+        break;
+      }
+    }
+    if (assigned === -1) {
+      assigned = colEndTimes.length;
+      colEndTimes.push(iv.end);
+    }
+    colAssign.set(iv.id, assigned);
+  }
+
+  const result = new Map<string, { col: number; total: number }>();
+  for (const iv of intervals) {
+    const overlapping = intervals.filter(o => o.start < iv.end && o.end > iv.start);
+    const maxCol = Math.max(...overlapping.map(o => colAssign.get(o.id)!));
+    result.set(iv.id, { col: colAssign.get(iv.id)!, total: maxCol + 1 });
+  }
+  return result;
+}
+
 export default function Timeline({ tasks, events, timelogs, categories, settings, onTimeLogStop, onRefresh }: Props) {
   const theme = useTheme();
   const t = theme;
@@ -200,15 +236,23 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     );
   });
 
+  const timelogColumns = computeTimelogColumns(timelogs);
+
   const timelogBlocks = timelogs.map(tl => {
     const sy = yPos(new Date(tl.start_time), base);
     const ey = tl.end_time ? yPos(new Date(tl.end_time), base) : nowY;
     const h = Math.max(ey - sy, 20);
     const active = !tl.end_time;
     const color = getCategoryColor(tl.category_id);
+    const { col, total } = timelogColumns.get(tl.id) ?? { col: 0, total: 1 };
+    const blockAreaLeft = 44;
+    const blockAreaRight = 8;
+    const colWidthExpr = `(100% - ${blockAreaLeft + blockAreaRight}px) / ${total}`;
+    const leftExpr = `${blockAreaLeft}px + (${colWidthExpr}) * ${col}`;
+    const widthExpr = total > 1 ? `calc(${colWidthExpr} - 2px)` : `calc(100% - ${blockAreaLeft + blockAreaRight}px)`;
     return (
       <div key={tl.id} data-block="1" onClick={() => setPopup({ y: sy, clickTime: new Date(tl.start_time), type: 'timelog', item: tl })}
-        style={{ position: 'absolute', left: 44, right: 8, top: sy, height: h, background: color + '33', border: `2px solid ${color}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer', zIndex: 5, overflow: 'hidden', boxSizing: 'border-box' }}>
+        style={{ position: 'absolute', left: `calc(${leftExpr})`, width: widthExpr, top: sy, height: h, background: color + '33', border: `2px solid ${color}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer', zIndex: 5, overflow: 'hidden', boxSizing: 'border-box' }}>
         <div style={{ fontSize: 12, color: t.textPrimary, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {active && <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: t.red, marginRight: 4, verticalAlign: 'middle' }} />}
           {tl.title}

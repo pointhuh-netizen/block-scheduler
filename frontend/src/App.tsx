@@ -201,7 +201,7 @@ export default function App() {
               onRefresh={loadData}
             />
           </div>
-          <TaskPool tasks={tasks} categories={categories} onRefresh={loadData} />
+          <TaskPool tasks={tasks} categories={categories} timelogs={timelogs} onRefresh={loadData} />
         </div>
 
         {/* Settings Modal */}

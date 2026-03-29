@@ -1,11 +1,12 @@
-import { useState, useRef, useCallback } from 'react';
-import type { Task, Category } from '../../types';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import type { Task, Category, TimeLog } from '../../types';
 import { tasks as tasksApi, timelogs as timelogsApi } from '../../api';
 import { useTheme } from '../../theme';
 
 interface Props {
   tasks: Task[];
   categories: Category[];
+  timelogs: TimeLog[];
   onRefresh: () => void;
 }
 
@@ -31,7 +32,7 @@ function totalRemainingHours(tasks: Task[]): number {
 type ActionModal = { task: Task } | null;
 type EditModal = { task: Task } | null;
 
-export default function TaskPool({ tasks, categories, onRefresh }: Props) {
+export default function TaskPool({ tasks, categories, timelogs, onRefresh }: Props) {
   const theme = useTheme();
   const t = theme;
 
@@ -42,13 +43,41 @@ export default function TaskPool({ tasks, categories, onRefresh }: Props) {
   const [manualTime, setManualTime] = useState(false);
   const [manualStart, setManualStart] = useState('');
   const [manualEnd, setManualEnd] = useState('');
+  const [tick, setTick] = useState(0);
   const dragStartY = useRef(0);
   const dragStartH = useRef(0);
+
+  // Refresh elapsed time display every 30 seconds
+  useEffect(() => {
+    const id = setInterval(() => setTick(n => n + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   const [addForm, setAddForm] = useState({ title: '', description: '', estimated_size: 'medium' as Task['estimated_size'], deadline: '', category_id: '' });
   const [editForm, setEditForm] = useState({ title: '', description: '', estimated_size: 'medium' as Task['estimated_size'], deadline: '', category_id: '' });
 
+  const activeTimelogByTask = useMemo(() => {
+    const map = new Map<string, TimeLog>();
+    for (const tl of timelogs) {
+      if (tl.task_id && !tl.end_time) map.set(tl.task_id, tl);
+    }
+    return map;
+  }, [timelogs]);
+
+  function elapsedLabel(startTime: string): string {
+    // `tick` changes every 30 s to trigger a re-render and keep the display fresh
+    const elapsed = Date.now() - new Date(startTime).getTime() + tick * 0;
+    const h = Math.floor(elapsed / 3600000);
+    const m = Math.floor((elapsed % 3600000) / 60000);
+    if (h > 0) return `${h}시간 ${m}분째`;
+    return `${m}분째`;
+  }
+
   const sortedTasks = [...tasks].filter(t => t.status !== 'done').sort((a, b) => {
+    const aActive = activeTimelogByTask.has(a.id);
+    const bActive = activeTimelogByTask.has(b.id);
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
     if (a.deadline && b.deadline) return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     if (a.deadline) return -1;
     if (b.deadline) return 1;
@@ -74,8 +103,23 @@ export default function TaskPool({ tasks, categories, onRefresh }: Props) {
   };
 
   const handleStartNow = async (task: Task) => {
+    const existing = activeTimelogByTask.get(task.id);
+    if (existing) {
+      // Already in progress — ask whether to stop old and restart
+      const confirmed = window.confirm(`"${task.title}"이(가) 이미 진행 중입니다.\n기존 기록을 종료하고 새로 시작하시겠습니까?`);
+      if (!confirmed) return;
+      await timelogsApi.stop(existing.id);
+    }
     await timelogsApi.create({ task_id: task.id, title: task.title, start_time: new Date().toISOString() });
     await tasksApi.update(task.id, { status: 'in_progress' });
+    onRefresh();
+    setActionModal(null);
+  };
+
+  const handleStopTask = async (task: Task) => {
+    const existing = activeTimelogByTask.get(task.id);
+    if (!existing) return;
+    await timelogsApi.stop(existing.id);
     onRefresh();
     setActionModal(null);
   };
@@ -146,22 +190,25 @@ export default function TaskPool({ tasks, categories, onRefresh }: Props) {
         {sortedTasks.map(task => {
           const cat = categories.find(c => c.id === task.category_id);
           const soon = task.deadline && new Date(task.deadline).getTime() - Date.now() < 24 * 3600000;
+          const activeTl = activeTimelogByTask.get(task.id);
           return (
             <div key={task.id} onClick={() => setActionModal({ task })}
               onContextMenu={e => { e.preventDefault(); openEdit(task); }}
-              style={{ background: t.bg3, borderRadius: 8, padding: '8px 10px', marginBottom: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${soon ? t.red + '55' : t.border}` }}>
+              style={{ background: t.bg3, borderRadius: 8, padding: '8px 10px', marginBottom: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${activeTl ? t.red + '66' : soon ? t.red + '55' : t.border}` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: t.textPrimary, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {task.status === 'in_progress' && <span style={{ color: t.accent, marginRight: 4 }}>▶</span>}
                   {task.title}
                 </div>
-                <div style={{ fontSize: 11, color: t.textSecondary, display: 'flex', gap: 8, marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: t.textSecondary, display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
                   <span>{SIZE_LABELS[task.estimated_size]}</span>
                   {cat && <span style={{ color: cat.color }}>● {cat.name}</span>}
                   {task.deadline
                     ? <span style={{ color: soon ? t.red : t.amber, fontWeight: 600 }}>{dday(task.deadline)}</span>
                     : <span style={{ color: t.textMuted }}>마감 없음</span>
                   }
+                  {activeTl && (
+                    <span style={{ color: t.red, fontWeight: 600 }}>🔴 진행 중 {elapsedLabel(activeTl.start_time)}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -176,7 +223,18 @@ export default function TaskPool({ tasks, categories, onRefresh }: Props) {
             <h4 style={{ margin: '0 0 16px', color: t.accent, fontSize: 15 }}>{actionModal.task.title}</h4>
             {!manualTime ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <button onClick={() => handleStartNow(actionModal.task)} style={{ padding: '12px 0', background: t.accent, color: 'white', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>▶ 지금 시작</button>
+                {activeTimelogByTask.has(actionModal.task.id) ? (
+                  <>
+                    <div style={{ padding: '8px 0', fontSize: 13, color: t.red, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.red, display: 'inline-block' }} />
+                      진행 중 — {elapsedLabel(activeTimelogByTask.get(actionModal.task.id)!.start_time)}
+                    </div>
+                    <button onClick={() => handleStopTask(actionModal.task)} style={{ padding: '12px 0', background: t.red, color: 'white', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>⏹ 끝내기</button>
+                    <button onClick={() => handleStartNow(actionModal.task)} style={{ padding: '12px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>🔄 재시작 (기존 기록 종료 후)</button>
+                  </>
+                ) : (
+                  <button onClick={() => handleStartNow(actionModal.task)} style={{ padding: '12px 0', background: t.accent, color: 'white', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>▶ 지금 시작</button>
+                )}
                 <button onClick={() => setManualTime(true)} style={{ padding: '12px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>✏️ 시간 직접 입력</button>
                 <button onClick={() => handleComplete(actionModal.task)} style={{ padding: '12px 0', background: t.green, color: 'white', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>✓ 완료</button>
                 <button onClick={() => openEdit(actionModal.task)} style={{ padding: '12px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>✏️ 편집</button>
