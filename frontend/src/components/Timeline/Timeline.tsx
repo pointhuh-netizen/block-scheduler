@@ -170,13 +170,13 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
   const [editForm, setEditForm] = useState<{ title: string; categoryId: string; startTime: string; endTime: string } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [now, setNow] = useState(new Date());
+  const hasActiveTimelog = timelogs.some(tl => !tl.end_time);
 
   useEffect(() => {
-    const hasActive = timelogs.some(tl => !tl.end_time);
-    const interval = hasActive ? 10000 : 60000;
+    const interval = hasActiveTimelog ? 10000 : 60000;
     const id = setInterval(() => setNow(new Date()), interval);
     return () => clearInterval(id);
-  }, [timelogs]);
+  }, [hasActiveTimelog]);
 
   const base = todayMidnight();
   base.setDate(base.getDate() - DAYS_BEFORE);
