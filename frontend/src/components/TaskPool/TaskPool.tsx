@@ -110,7 +110,7 @@ export default function TaskPool({ tasks, categories, timelogs, onRefresh }: Pro
       if (!confirmed) return;
       await timelogsApi.stop(existing.id);
     }
-    await timelogsApi.create({ task_id: task.id, title: task.title, start_time: new Date().toISOString() });
+    await timelogsApi.create({ task_id: task.id, title: task.title, category_id: task.category_id || undefined, start_time: new Date().toISOString() });
     await tasksApi.update(task.id, { status: 'in_progress' });
     onRefresh();
     setActionModal(null);
@@ -126,7 +126,7 @@ export default function TaskPool({ tasks, categories, timelogs, onRefresh }: Pro
 
   const handleManualTime = async (task: Task) => {
     if (!manualStart) return;
-    await timelogsApi.create({ task_id: task.id, title: task.title, start_time: new Date(manualStart).toISOString(), end_time: manualEnd ? new Date(manualEnd).toISOString() : undefined });
+    await timelogsApi.create({ task_id: task.id, title: task.title, category_id: task.category_id || undefined, start_time: new Date(manualStart).toISOString(), end_time: manualEnd ? new Date(manualEnd).toISOString() : undefined });
     await tasksApi.update(task.id, { status: 'in_progress' });
     onRefresh();
     setActionModal(null);

@@ -166,7 +166,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
   const t = theme;
   const containerRef = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<{ y: number; clickTime: Date; type: 'add' | 'timelog' | 'event'; item?: TimeLog | CalendarEvent } | null>(null);
-  const [addForm, setAddForm] = useState<{ mode: 'timelog' | 'event'; title: string; endTime: string } | null>(null);
+  const [addForm, setAddForm] = useState<{ mode: 'timelog' | 'event'; title: string; categoryId: string; endTime: string } | null>(null);
   const [editForm, setEditForm] = useState<{ title: string; categoryId: string; startTime: string; endTime: string } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -206,8 +206,8 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
   };
 
   const getCategoryColor = useCallback((id?: string) => {
-    if (!id) return '#9CC5E0';
-    return categories.find(c => c.id === id)?.color || '#9CC5E0';
+    if (!id) return '#A0A8B0';
+    return categories.find(c => c.id === id)?.color || '#A0A8B0';
   }, [categories]);
 
   useEffect(() => {
@@ -378,10 +378,10 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     if (!addForm || !popup) return;
     const startISO = popup.clickTime.toISOString();
     if (addForm.mode === 'timelog') {
-      await timelogsApi.create({ title: addForm.title, start_time: startISO, end_time: addForm.endTime || undefined });
+      await timelogsApi.create({ title: addForm.title, category_id: addForm.categoryId || undefined, start_time: startISO, end_time: addForm.endTime || undefined });
     } else {
       if (!addForm.endTime) return;
-      await eventsApi.create({ title: addForm.title, start_time: startISO, end_time: new Date(addForm.endTime).toISOString() });
+      await eventsApi.create({ title: addForm.title, category_id: addForm.categoryId || undefined, start_time: startISO, end_time: new Date(addForm.endTime).toISOString() });
     }
     onRefresh();
     setPopup(null);
@@ -421,8 +421,8 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
                   {popup.clickTime.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <button onClick={() => setAddForm({ mode: 'timelog', title: '', endTime: '' })} style={{ padding: '10px 0', background: t.accent, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>⏱ 시간 기록 추가</button>
-                  <button onClick={() => setAddForm({ mode: 'event', title: '', endTime: '' })} style={{ padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>📌 일정 추가</button>
+                  <button onClick={() => setAddForm({ mode: 'timelog', title: '', categoryId: '', endTime: '' })} style={{ padding: '10px 0', background: t.accent, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>⏱ 시간 기록 추가</button>
+                  <button onClick={() => setAddForm({ mode: 'event', title: '', categoryId: '', endTime: '' })} style={{ padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>📌 일정 추가</button>
                   <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: 'transparent', color: t.textSecondary, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
                 </div>
               </>
@@ -432,6 +432,12 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
                 <h4 style={{ margin: 0, color: t.accent }}>{addForm.mode === 'timelog' ? '⏱ 시간 기록' : '📌 일정'} 추가</h4>
                 <input value={addForm.title} onChange={e => setAddForm(f => f ? { ...f, title: e.target.value } : null)} placeholder="제목" required
                   style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
+                <select value={addForm.categoryId} onChange={e => setAddForm(f => f ? { ...f, categoryId: e.target.value } : null)}
+                  aria-label="카테고리"
+                  style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }}>
+                  <option value="">카테고리 없음</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
                 <label style={{ fontSize: 12, color: t.textSecondary, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   종료 시간{addForm.mode === 'event' ? ' (필수)' : ' (선택)'}
                   <input type="datetime-local" value={addForm.endTime} onChange={e => setAddForm(f => f ? { ...f, endTime: e.target.value } : null)} required={addForm.mode === 'event'}
