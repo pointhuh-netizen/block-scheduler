@@ -162,6 +162,8 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
   const containerRef = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<{ y: number; clickTime: Date; type: 'add' | 'timelog' | 'event'; item?: TimeLog | CalendarEvent } | null>(null);
   const [addForm, setAddForm] = useState<{ mode: 'timelog' | 'event'; title: string; endTime: string } | null>(null);
+  const [editForm, setEditForm] = useState<{ title: string; categoryId: string; startTime: string; endTime: string } | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const base = todayMidnight();
   base.setDate(base.getDate() - DAYS_BEFORE);
@@ -169,6 +171,34 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
 
   const sleepPeriods = parseSleepPeriods(base, settings);
   const ghostBlocks = computeGhostBlocks(tasks, events, sleepPeriods);
+
+  function toDatetimeLocal(iso: string): string {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  const openEditPopup = (type: 'timelog' | 'event', item: TimeLog | CalendarEvent, y: number) => {
+    setPopup({ y, clickTime: new Date((item as TimeLog).start_time), type, item });
+    if (type === 'timelog') {
+      const tl = item as TimeLog;
+      setEditForm({
+        title: tl.title,
+        categoryId: tl.category_id || '',
+        startTime: toDatetimeLocal(tl.start_time),
+        endTime: tl.end_time ? toDatetimeLocal(tl.end_time) : '',
+      });
+    } else {
+      const ev = item as CalendarEvent;
+      setEditForm({
+        title: ev.title,
+        categoryId: ev.category_id || '',
+        startTime: toDatetimeLocal(ev.start_time),
+        endTime: toDatetimeLocal(ev.end_time),
+      });
+    }
+    setConfirmingDelete(false);
+  };
 
   const getCategoryColor = useCallback((id?: string) => {
     if (!id) return '#6366f1';
@@ -191,6 +221,46 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const clickTime = new Date(base.getTime() + y / PX_PER_MIN * 60000);
     setPopup({ y, clickTime, type: 'add' });
     setAddForm(null);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm || !popup?.item) return;
+    const startISO = new Date(editForm.startTime).toISOString();
+    const endISO = editForm.endTime ? new Date(editForm.endTime).toISOString() : undefined;
+    if (popup.type === 'timelog') {
+      await timelogsApi.update(popup.item.id, {
+        title: editForm.title,
+        category_id: editForm.categoryId || undefined,
+        start_time: startISO,
+        end_time: endISO,
+      });
+    } else {
+      if (!endISO) return;
+      await eventsApi.update(popup.item.id, {
+        title: editForm.title,
+        category_id: editForm.categoryId || undefined,
+        start_time: startISO,
+        end_time: endISO,
+      });
+    }
+    onRefresh();
+    setPopup(null);
+    setEditForm(null);
+    setConfirmingDelete(false);
+  };
+
+  const handleDelete = async () => {
+    if (!popup?.item) return;
+    if (popup.type === 'timelog') {
+      await timelogsApi.delete(popup.item.id);
+    } else {
+      await eventsApi.delete(popup.item.id);
+    }
+    onRefresh();
+    setPopup(null);
+    setEditForm(null);
+    setConfirmingDelete(false);
   };
 
   const scrollToNow = () => {
@@ -251,7 +321,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const leftExpr = `${blockAreaLeft}px + (${colWidthExpr}) * ${col}`;
     const widthExpr = total > 1 ? `calc(${colWidthExpr} - 2px)` : `calc(100% - ${blockAreaLeft + blockAreaRight}px)`;
     return (
-      <div key={tl.id} data-block="1" onClick={() => setPopup({ y: sy, clickTime: new Date(tl.start_time), type: 'timelog', item: tl })}
+      <div key={tl.id} data-block="1" onClick={() => openEditPopup('timelog', tl, sy)}
         style={{ position: 'absolute', left: `calc(${leftExpr})`, width: widthExpr, top: sy, height: h, background: color + '33', border: `2px solid ${color}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer', zIndex: 5, overflow: 'hidden', boxSizing: 'border-box' }}>
         <div style={{ fontSize: 12, color: t.textPrimary, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {active && <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: t.red, marginRight: 4, verticalAlign: 'middle' }} />}
@@ -268,7 +338,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
     const h = Math.max(ey - sy, 20);
     const color = getCategoryColor(ev.category_id);
     return (
-      <div key={ev.id} data-block="1" onClick={() => setPopup({ y: sy, clickTime: new Date(ev.start_time), type: 'event', item: ev })}
+      <div key={ev.id} data-block="1" onClick={() => openEditPopup('event', ev, sy)}
         style={{ position: 'absolute', left: 44, right: 8, top: sy, height: h, background: color + '22', border: `2px dashed ${color}`, borderRadius: 6, padding: '2px 6px', cursor: 'pointer', zIndex: 4, overflow: 'hidden', boxSizing: 'border-box' }}>
         <div style={{ fontSize: 12, color: t.textPrimary, fontWeight: 600 }}>📌 {ev.title}</div>
       </div>
@@ -337,7 +407,7 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
 
       {/* Popup */}
       {popup && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => { setPopup(null); setAddForm(null); }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => { setPopup(null); setAddForm(null); setEditForm(null); setConfirmingDelete(false); }}>
           <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', background: t.bg2, borderRadius: 12, padding: 20, minWidth: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
             {popup.type === 'add' && !addForm && (
               <>
@@ -367,27 +437,93 @@ export default function Timeline({ tasks, events, timelogs, categories, settings
                 </div>
               </form>
             )}
-            {popup.type === 'timelog' && popup.item && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <h4 style={{ margin: 0, color: t.accent }}>⏱ {(popup.item as TimeLog).title}</h4>
-                <p style={{ margin: 0, fontSize: 13, color: t.textSecondary }}>
-                  {new Date((popup.item as TimeLog).start_time).toLocaleString('ko-KR')} ~ {(popup.item as TimeLog).end_time ? new Date((popup.item as TimeLog).end_time!).toLocaleString('ko-KR') : '진행 중'}
-                </p>
-                {!(popup.item as TimeLog).end_time && (
-                  <button onClick={() => { onTimeLogStop((popup.item as TimeLog).id); setPopup(null); }} style={{ padding: '10px 0', background: t.red, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>⏹ 중지</button>
+            {popup.type === 'timelog' && popup.item && editForm && (
+              <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <h4 style={{ margin: 0, color: t.accent }}>⏱ 기록 편집</h4>
+                {confirmingDelete ? (
+                  <>
+                    <p style={{ margin: 0, fontSize: 14, color: t.textPrimary }}>정말 삭제하시겠습니까?</p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={handleDelete} style={{ flex: 1, padding: '10px 0', background: t.red, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>삭제</button>
+                      <button type="button" onClick={() => setConfirmingDelete(false)} style={{ flex: 1, padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <input value={editForm.title} onChange={e => setEditForm(f => f ? { ...f, title: e.target.value } : null)} placeholder="제목" required
+                      style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
+                    <label style={{ fontSize: 12, color: t.textSecondary, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      카테고리
+                      <select value={editForm.categoryId} onChange={e => setEditForm(f => f ? { ...f, categoryId: e.target.value } : null)}
+                        style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }}>
+                        <option value="">없음</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 12, color: t.textSecondary, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      시작 시간
+                      <input type="datetime-local" value={editForm.startTime} onChange={e => setEditForm(f => f ? { ...f, startTime: e.target.value } : null)} required
+                        style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
+                    </label>
+                    <label style={{ fontSize: 12, color: t.textSecondary, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      종료 시간 (선택)
+                      <input type="datetime-local" value={editForm.endTime} onChange={e => setEditForm(f => f ? { ...f, endTime: e.target.value } : null)}
+                        style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
+                    </label>
+                    {!(popup.item as TimeLog).end_time && (
+                      <button type="button" onClick={() => { onTimeLogStop((popup.item as TimeLog).id); setPopup(null); setEditForm(null); }}
+                        style={{ padding: '10px 0', background: t.red, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>⏹ 중지</button>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={() => setConfirmingDelete(true)} style={{ padding: '10px 14px', background: 'transparent', color: t.red, border: `1px solid ${t.red}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>삭제</button>
+                      <button type="button" onClick={() => { setPopup(null); setEditForm(null); }} style={{ flex: 1, padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
+                      <button type="submit" style={{ flex: 1, padding: '10px 0', background: t.accent, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>저장</button>
+                    </div>
+                  </>
                 )}
-                <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>닫기</button>
-              </div>
+              </form>
             )}
-            {popup.type === 'event' && popup.item && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <h4 style={{ margin: 0, color: t.accent }}>📌 {(popup.item as CalendarEvent).title}</h4>
-                <p style={{ margin: 0, fontSize: 13, color: t.textSecondary }}>
-                  {new Date((popup.item as CalendarEvent).start_time).toLocaleString('ko-KR')} ~ {new Date((popup.item as CalendarEvent).end_time).toLocaleString('ko-KR')}
-                </p>
-                {(popup.item as CalendarEvent).description && <p style={{ margin: 0, fontSize: 13, color: t.textPrimary }}>{(popup.item as CalendarEvent).description}</p>}
-                <button onClick={() => setPopup(null)} style={{ padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>닫기</button>
-              </div>
+            {popup.type === 'event' && popup.item && editForm && (
+              <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <h4 style={{ margin: 0, color: t.accent }}>📌 일정 편집</h4>
+                {confirmingDelete ? (
+                  <>
+                    <p style={{ margin: 0, fontSize: 14, color: t.textPrimary }}>정말 삭제하시겠습니까?</p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={handleDelete} style={{ flex: 1, padding: '10px 0', background: t.red, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>삭제</button>
+                      <button type="button" onClick={() => setConfirmingDelete(false)} style={{ flex: 1, padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <input value={editForm.title} onChange={e => setEditForm(f => f ? { ...f, title: e.target.value } : null)} placeholder="제목" required
+                      style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
+                    <label style={{ fontSize: 12, color: t.textSecondary, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      카테고리
+                      <select value={editForm.categoryId} onChange={e => setEditForm(f => f ? { ...f, categoryId: e.target.value } : null)}
+                        style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }}>
+                        <option value="">없음</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 12, color: t.textSecondary, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      시작 시간
+                      <input type="datetime-local" value={editForm.startTime} onChange={e => setEditForm(f => f ? { ...f, startTime: e.target.value } : null)} required
+                        style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
+                    </label>
+                    <label style={{ fontSize: 12, color: t.textSecondary, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      종료 시간
+                      <input type="datetime-local" value={editForm.endTime} onChange={e => setEditForm(f => f ? { ...f, endTime: e.target.value } : null)} required
+                        style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg3, color: t.textPrimary, fontSize: 14 }} />
+                    </label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={() => setConfirmingDelete(true)} style={{ padding: '10px 14px', background: 'transparent', color: t.red, border: `1px solid ${t.red}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>삭제</button>
+                      <button type="button" onClick={() => { setPopup(null); setEditForm(null); }} style={{ flex: 1, padding: '10px 0', background: t.bg3, color: t.textPrimary, border: `1px solid ${t.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>취소</button>
+                      <button type="submit" style={{ flex: 1, padding: '10px 0', background: t.accent, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>저장</button>
+                    </div>
+                  </>
+                )}
+              </form>
             )}
           </div>
         </div>
